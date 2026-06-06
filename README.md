@@ -1,249 +1,199 @@
 # Sky Q MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that exposes your **Sky Q satellite receiver** to AI assistants such as Claude.  
-It wraps the excellent [`pyskyqremote`](https://github.com/RogerSelwyn/skyq_remote) library by Roger Selwyn.
+A Docker-based [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for
+controlling Sky Q satellite receivers.  It exposes Sky Q features as MCP tools, including
+EPG data, programme information, recording management, and remote-control commands.
+
+Built on top of [pyskyqremote](https://github.com/RogerSelwyn/skyq_remote) by Roger Selwyn.
+Primarily designed for UK receivers, with support for Italy and Germany.
 
 ---
 
-## Features
+## Quick Start
 
-| Category | What you can do |
+Create a local environment file:
+
+```sh
+make init
+```
+
+Edit `.env` and set your Sky Q box address:
+
+```sh
+SKYQ_HOST=192.168.1.99
+```
+
+Remote-control commands, channel changes, and recording deletion are disabled by default.
+Enable them explicitly if you want assistants to change receiver state:
+
+```sh
+SKYQ_ALLOW_MUTATIONS=true
+```
+
+Start the MCP server:
+
+```sh
+make start
+```
+
+The MCP endpoint is available at:
+
+```
+http://localhost:8000/mcp
+```
+
+A health check is available at:
+
+```
+http://localhost:8000/health
+```
+
+View logs:
+
+```sh
+make logs
+```
+
+Stop the service:
+
+```sh
+make down
+```
+
+---
+
+## Makefile
+
+All operations go through `make`:
+
+```sh
+make help
+```
+
+Key targets:
+
+| Target | Description |
 |---|---|
-| **Connection** | Register / unregister multiple Sky Q boxes by IP |
-| **Device info** | Hardware model, firmware version, HDR/UHD capability, country |
-| **Status** | Power state, transport state (PLAYING / PAUSED / STOPPED) |
-| **Media** | Currently playing channel, channel number, live vs. recording |
-| **Applications** | Which app is active (Netflix, YouTube, …) |
-| **EPG** | Full programme guide for any channel and date range |
-| **Recordings** | List, inspect, and delete PVR recordings |
-| **Remote control** | Send any key press; tune to a channel by number |
+| `make init` | Create `.env` from `.env.example` |
+| `make build` | Build the Docker image |
+| `make up` | Start in the foreground |
+| `make start` | Start in the background |
+| `make logs` | Follow service logs |
+| `make down` | Stop and remove containers |
+| `make check` | Check Python syntax and Compose config |
+| `make test` | Run unit tests (no Sky Q box required) |
+| `make test-e2e` | Run end-to-end tests (requires real box) |
 
 ---
 
-## Requirements
+## MCP Client Configuration
 
-- Python 3.11+
-- A Sky Q box on your local network with the REST/JSON API accessible  
-  (standard on all modern Sky Q hardware; UK, Italy, Germany supported)
-- [`pyskyqremote`](https://pypi.org/project/pyskyqremote/) ≥ 0.3.8
-- [`mcp`](https://pypi.org/project/mcp/) ≥ 1.0.0
-
-> **Note:** `pyskyqremote` is no longer actively maintained by its author (no Sky Q hardware available for testing), but the library remains functional against current Sky Q firmware.
-
----
-
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/skyq-mcp-server.git
-cd skyq-mcp-server
-
-# Create and activate a virtual environment (recommended)
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# Install in editable mode
-pip install -e .
-
-# For development (tests, linting)
-pip install -e ".[dev]"
-```
-
----
-
-## Running the server
-
-The server communicates over **stdio** (standard MCP transport):
-
-```bash
-python -m skyq_mcp
-```
-
-Or via the installed script:
-
-```bash
-skyq-mcp-server
-```
-
----
-
-## Connecting to an MCP client
-
-### Claude Desktop (`claude_desktop_config.json`)
+For MCP clients that support Streamable HTTP:
 
 ```json
 {
   "mcpServers": {
     "skyq": {
-      "command": "python",
-      "args": ["-m", "skyq_mcp"],
-      "cwd": "/path/to/skyq-mcp-server"
+      "transport": "http",
+      "url": "http://localhost:8000/mcp"
     }
   }
 }
 ```
 
-### Claude Code CLI
-
-```bash
-claude mcp add skyq -- python -m skyq_mcp
-```
-
 ---
 
-## Tool Reference
+## Available Tools
 
-### Connection management
+### Read-only (always available)
 
 | Tool | Description |
 |---|---|
-| `skyq_connect` | Register a Sky Q box by IP. Call this first. |
-| `skyq_list_devices` | List all registered boxes. |
-| `skyq_disconnect` | Remove a registered box. |
+| `skyq_device_info` | Hardware model, firmware, serial number, HDR/UHD capability |
+| `skyq_power_status` | Power state: ON, STANDBY, or POWERED OFF |
+| `skyq_current_state` | Transport state: PLAYING, PAUSED_PLAYBACK, STOPPED |
+| `skyq_current_media` | Currently playing channel or recording |
+| `skyq_active_application` | App currently running (Netflix, YouTube, …) |
+| `skyq_epg` | EPG schedule for a channel by service ID and date |
+| `skyq_programme_from_epg` | Single programme details by UUID |
+| `skyq_current_live_programme` | Programme on air right now |
+| `skyq_recordings` | Paginated list of stored recordings |
+| `skyq_recording` | Details of one recording by PVR ID |
 
-**`skyq_connect` parameters:**
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `host` | string | required | IP address of the Sky Q box |
-| `port` | integer | 49160 | Control port |
-| `json_port` | integer | 9006 | JSON API port |
-| `epg_cache_len` | integer | 20 | EPG cache size |
-
----
-
-### Device & status
+### Mutation tools (require `SKYQ_ALLOW_MUTATIONS=true`)
 
 | Tool | Description |
 |---|---|
-| `skyq_get_device_info` | Hardware/software details |
-| `skyq_power_status` | "ON", "STANDBY", or "POWERED OFF" |
-| `skyq_get_current_state` | Transport state (PLAYING, PAUSED_PLAYBACK, STOPPED …) |
+| `skyq_press` | Send remote-control key presses |
+| `skyq_set_channel` | Tune to a channel by number |
+| `skyq_delete_recording` | Permanently delete a recording |
 
 ---
 
-### Media & channels
+## Safety
 
-| Tool | Description |
-|---|---|
-| `skyq_get_current_media` | Currently tuned channel or active recording PVR ID |
-| `skyq_get_active_application` | App ID and title of the running application |
+Write/mutation tools are **disabled by default**.  An AI assistant cannot accidentally
+change your receiver state unless you explicitly opt in:
+
+```sh
+# .env
+SKYQ_ALLOW_MUTATIONS=true
+```
+
+Calling a mutation tool without this flag returns an error explaining how to enable it.
 
 ---
 
-### EPG (Electronic Programme Guide)
+## Integration Tests
 
-| Tool | Parameters | Description |
+End-to-end tests run inside Docker and require a real Sky Q box:
+
+```sh
+make test-e2e           # direct + MCP layer
+make test-e2e-direct    # Sky Q box directly, no MCP
+make test-e2e-mcp       # MCP HTTP layer only
+```
+
+Optional mutation smoke test (sends a single key press):
+
+```sh
+make test-e2e-mutation-smoke
+```
+
+Unit tests (fully mocked, no box required):
+
+```sh
+make test
+```
+
+---
+
+## Configuration Reference
+
+All settings are read from `.env` (or environment variables):
+
+| Variable | Default | Description |
 |---|---|---|
-| `skyq_get_epg` | `host`, `sid`, `date` (YYYY-MM-DD), `days` | EPG data for a channel |
-| `skyq_get_programme_from_epg` | `host`, `sid`, `programme_uuid` | Single programme details |
-| `skyq_get_current_live_tv_programme` | `host`, `sid` (optional) | Programme on air right now |
-
-The **service ID** (`sid`) identifies a channel in the Sky EPG — e.g. `2153` for BBC One South, `1143` for Sky Comedy HD.  
-You can discover the current channel's SID with `skyq_get_current_media`.
-
----
-
-### Recordings (PVR)
-
-| Tool | Parameters | Description |
-|---|---|---|
-| `skyq_get_recordings` | `host`, `offset`, `limit` | Paginated list of recordings |
-| `skyq_get_recording` | `host`, `pvrid` | Details of one recording |
-| `skyq_delete_recording` | `host`, `pvrid` | Delete a recording |
+| `SKYQ_HOST` | *(required)* | IP address of the Sky Q box |
+| `SKYQ_PORT` | `49160` | Control port |
+| `SKYQ_JSON_PORT` | `9006` | JSON API port |
+| `SKYQ_EPG_CACHE_LEN` | `20` | EPG cache size |
+| `SKYQ_ALLOW_MUTATIONS` | `false` | Enable write/control tools |
+| `SERVER_HOST` | `0.0.0.0` | Server bind address |
+| `SERVER_PORT` | `8000` | Server port |
 
 ---
 
-### Remote control
+## Notes
 
-| Tool | Parameters | Description |
-|---|---|---|
-| `skyq_press` | `host`, `keys` (array) | Send key presses |
-| `skyq_set_channel` | `host`, `channel_number` | Tune to a channel |
-
-**Supported key names for `skyq_press`:**
-
-```
-sky  power  tvguide  boxoffice  services  interactive  search  sidebar
-backup  help  up  down  left  right  select  channelup  channeldown
-i  text  rewind  play  fastforward  stop  pause  record
-red  green  yellow  blue  0  1  2  3  4  5  6  7  8  9
-```
-
----
-
-## Example conversation
-
-```
-You: Connect to my Sky Q box at 192.168.1.99
-Claude: [calls skyq_connect with host=192.168.1.99]
-        Connected. Falcon / ES240, firmware 32B12D, HDR & UHD capable.
-
-You: What's on BBC One right now?
-Claude: [calls skyq_get_current_live_tv_programme with sid=2153]
-        "EastEnders" — 19:30–20:00. Drama set in the East End of London.
-
-You: Show me tonight's BBC One schedule
-Claude: [calls skyq_get_epg with sid=2153, date=today, days=1]
-        19:30  EastEnders
-        20:00  The One Show
-        ...
-
-You: What recordings do I have?
-Claude: [calls skyq_get_recordings]
-        1. Planet Earth III (P00001AA) — recorded 2024-01-15
-        2. Formula 1 Highlights (P00002BB) — recorded 2024-01-14
-        ...
-
-You: Pause the TV
-Claude: [calls skyq_press with keys=["pause"]]
-        Done.
-```
-
----
-
-## Development
-
-```bash
-# Run tests
-pytest
-
-# Lint
-ruff check src/ tests/
-
-# Type-check
-mypy src/
-```
-
-### Project structure
-
-```
-skyq-mcp-server/
-├── src/
-│   └── skyq_mcp/
-│       ├── __init__.py        # Package metadata
-│       ├── __main__.py        # CLI entry point
-│       ├── server.py          # MCP server & tool definitions
-│       └── skyq_client.py     # SkyQRemote connection manager
-├── tests/
-│   ├── conftest.py
-│   └── test_server.py         # Unit tests (fully mocked)
-├── pyproject.toml
-└── README.md
-```
-
----
-
-## Limitations & notes
-
-- The `pyskyqremote` library is no longer actively maintained; it works against current Sky Q firmware but may break if Sky update the API.
-- Recording management (delete) should be used with care — there is no undo.
-- Channel service IDs (`sid`) are Sky-specific and differ by region and bouquet. Consult the EPG or `get_current_media` to discover them.
-- The server manages multiple boxes in a single process; each `skyq_connect` call adds an entry to an in-memory registry that resets when the server restarts.
+- `pyskyqremote` is no longer actively maintained (the author no longer has Sky Q hardware),
+  but the library is functional against current Sky Q firmware.
+- Channel service IDs (`sid`) are Sky-specific — use `skyq_current_media` to discover
+  the sid of the currently tuned channel.
+- Recording deletion is permanent; there is no undo.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT

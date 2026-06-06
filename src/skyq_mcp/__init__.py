@@ -1,4 +1,3 @@
-"""Sky Q MCP Server - Model Context Protocol server for Sky Q receivers."""
+"""Sky Q MCP Server."""
 
 __version__ = "0.1.0"
-__author__ = "skyq-mcp-server contributors"

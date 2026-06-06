@@ -1,11 +1,21 @@
-"""Allow running the server with `python -m skyq_mcp`."""
+"""Start the Sky Q MCP server with uvicorn."""
 
-import asyncio
 import logging
 
-from .server import run
+import uvicorn
 
-logging.basicConfig(level=logging.INFO)
+from skyq_mcp import settings
+from skyq_mcp.server import create_app
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    uvicorn.run(
+        create_app(),
+        host=settings.SERVER_HOST,
+        port=settings.SERVER_PORT,
+        log_level="info",
+    )
