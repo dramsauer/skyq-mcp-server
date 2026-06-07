@@ -29,7 +29,7 @@ dev = [
 ]
 
 [project.scripts]
-skyq-mcp-server = "skyq_mcp.__main__"
+skyq-mcp-server = "skyq_mcp.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/skyq_mcp"]

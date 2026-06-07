@@ -362,12 +362,9 @@ def create_app() -> Starlette:
         stateless=True,
     )
 
-    async def handle_mcp(request: Request) -> Any:
-        return await session_manager.handle_request(request)
-
     return Starlette(
         routes=[
             Route("/health", _health, methods=["GET"]),
-            Mount("/mcp", app=session_manager.asgi_app),
+            Mount("/mcp", app=session_manager.handle_request),
         ]
     )

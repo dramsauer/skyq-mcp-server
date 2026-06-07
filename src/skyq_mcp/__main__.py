@@ -12,10 +12,15 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
-if __name__ == "__main__":
+
+def main() -> None:
     uvicorn.run(
         create_app(),
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
         log_level="info",
     )
+
+
+if __name__ == "__main__":
+    main()
