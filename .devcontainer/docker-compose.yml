@@ -1,0 +1,22 @@
+# Dev-time override layered on top of ../docker-compose.yml.
+# Used only by the dev container — production `docker compose up` is unaffected.
+services:
+  skyq-mcp:
+    # Mount the working tree so code edits are live inside the container.
+    # The image already pip-installed the package; postCreateCommand reinstalls
+    # it editable against this mount.
+    volumes:
+      # Relative paths resolve against the project root (the dir of the first
+      # compose file), so "." is this repo, not ".devcontainer".
+      - .:/workspaces/stack-skyq-mcp:cached
+    working_dir: /workspaces/stack-skyq-mcp
+
+    # Keep the container running regardless of the server process, so VS Code
+    # can attach. Start the server yourself with:
+    #   skyq-mcp-server
+    # or, with auto-reload during development:
+    #   uvicorn --factory skyq_mcp.server:create_app --host 0.0.0.0 --port 8000 --reload
+    command: sleep infinity
+
+    # Don't auto-restart while developing.
+    restart: "no"

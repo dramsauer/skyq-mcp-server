@@ -103,6 +103,71 @@ For MCP clients that support Streamable HTTP:
 
 ---
 
+## Talking to the server with curl
+
+The server speaks the MCP **Streamable HTTP** transport. To call a tool directly,
+`POST` a JSON-RPC `tools/call` request to `/mcp/` (note the **trailing slash** — a request
+to `/mcp` is redirected). You must accept both JSON and SSE, because the server streams its
+reply as a `text/event-stream` (`event: message` / `data: …`).
+
+**Check the box is reachable** — its power state:
+
+```sh
+curl -s -X POST http://localhost:8000/mcp/ \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"skyq_power_status","arguments":{}}}'
+```
+
+```text
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text",
+       "text":"{\n  \"power_status\": \"ON\"\n}"}],"isError":false}}
+```
+
+**Find a channel's service ID** — `skyq_current_media` returns the `sid` of whatever is
+currently tuned (e.g. `141` for *Sky Sport Mix*):
+
+```sh
+curl -s -X POST http://localhost:8000/mcp/ \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"skyq_current_media","arguments":{}}}'
+```
+
+**Get the EPG for a specific day** — here, tomorrow's schedule (`days: 1`) for sid `141`.
+`date` is `YYYY-MM-DD` (UTC) and defaults to today if omitted:
+
+```sh
+curl -s -X POST http://localhost:8000/mcp/ \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"skyq_epg",
+                 "arguments":{"sid":141,"date":"2025-01-02","days":1}}}'
+```
+
+The tool result is JSON encoded as a string inside the SSE `data:` line. To strip the SSE
+framing and pretty-print the programme list:
+
+```sh
+curl -s -X POST http://localhost:8000/mcp/ \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"skyq_epg","arguments":{"sid":141,"days":1}}}' \
+  | sed -n 's/^data: //p' \
+  | python3 -c 'import sys,json; print(json.loads(json.load(sys.stdin)["result"]["content"][0]["text"]).get("channelname"))'
+```
+
+> **Port note:** these examples assume the default `SERVER_PORT=8000`. If you set a
+> different `SERVER_PORT` in `.env` (e.g. `8009`), Compose publishes that same port on the
+> host — just use it in the URLs above (`http://localhost:8009/mcp/`).
+
+---
+
 ## Available Tools
 
 ### Read-only (always available)

@@ -1,0 +1,52 @@
+{
+  "name": "skyq-mcp-server",
+
+  // The dev container *is* the compose service. The base file is your
+  // production compose; the override keeps the container alive and mounts
+  // the source for live editing.
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.yml"
+  ],
+  "service": "skyq-mcp",
+  "workspaceFolder": "/workspaces/stack-skyq-mcp",
+
+  // Editable install with dev deps so edits in the mounted tree take effect,
+  // plus scaffold .env from the example if it doesn't exist yet.
+  "postCreateCommand": "pip install -e '.[dev]' && make init",
+
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "MCP server",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"],
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          }
+        }
+      }
+    }
+  },
+
+  // Tear the compose project down when the window closes.
+  "shutdownAction": "stopCompose"
+}
