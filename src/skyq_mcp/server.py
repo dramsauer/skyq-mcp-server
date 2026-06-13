@@ -7,8 +7,10 @@ SKYQ_ALLOW_MUTATIONS=true is set.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from typing import Any
 
@@ -362,9 +364,17 @@ def create_app() -> Starlette:
         stateless=True,
     )
 
+    # The session manager must be running for the lifetime of the app, otherwise
+    # /mcp requests fail with "Task group is not initialized".
+    @contextlib.asynccontextmanager
+    async def lifespan(_: Starlette) -> AsyncIterator[None]:
+        async with session_manager.run():
+            yield
+
     return Starlette(
         routes=[
             Route("/health", _health, methods=["GET"]),
             Mount("/mcp", app=session_manager.handle_request),
-        ]
+        ],
+        lifespan=lifespan,
     )
